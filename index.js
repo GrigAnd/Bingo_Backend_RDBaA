@@ -4,14 +4,14 @@ const sign = require("./module/sign")
 
 const fastify = require('fastify')({
 });
-fastify.register(require('fastify-formbody'));
-fastify.register(require('fastify-cors'), {
+fastify.register(require('@fastify/formbody'));
+fastify.register(require('@fastify/cors'), {
   origin: "*",
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 })
 
 
-fastify.register(require('fastify-rate-limit'),
+fastify.register(require('@fastify/rate-limit'),
   {
     global: false, 
     keyGenerator: (request) => {
@@ -28,7 +28,10 @@ fastify.register(require('fastify-easy-route'));
 
 const start = () => {
   try {
-    fastify.listen(process.env.PORT || 80, process.env.IP || '0.0.0.0', (error) => {
+    fastify.listen({
+      port: parseInt(process.env.PORT) || 80,
+      host: process.env.IP || '0.0.0.0'
+    }, (error) => {
       if (error) {
         fastify.log.error(error);
         process.exit(1);
@@ -37,7 +40,7 @@ const start = () => {
     })
 
 
-    const mongo = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true });
+    const mongo = new MongoClient(process.env.MONGO_URL);
 
     mongo.connect(
       (err, client) => {
