@@ -1,8 +1,18 @@
 const MongoClient = require('mongodb').MongoClient;
-const sign = require("./module/sign")
+const sign = require("./module/sign");
+const fs = require('fs');
+const path = require('path');
 
+const logsDir = path.join(__dirname, 'logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir);
+}
 
 const fastify = require('fastify')({
+  logger: {
+    level: 'info',
+    file: path.join(logsDir, 'app.log')
+  }
 });
 fastify.register(require('@fastify/formbody'));
 fastify.register(require('@fastify/cors'), {
@@ -26,6 +36,12 @@ fastify.register(require('@fastify/rate-limit'),
 
 fastify.register(require('fastify-easy-route'));
 
+const logErrorToFile = (error) => {
+  const logPath = path.join(logsDir, 'error.log');
+  const logMessage = `${new Date().toISOString()} - ERROR: ${error.stack || error}\n`;
+  fs.appendFileSync(logPath, logMessage);
+};
+
 const start = () => {
   try {
     fastify.listen({
@@ -33,6 +49,7 @@ const start = () => {
       host: process.env.IP || '0.0.0.0'
     }, (error) => {
       if (error) {
+        logErrorToFile(error);
         fastify.log.error(error);
         process.exit(1);
       }
@@ -42,20 +59,18 @@ const start = () => {
 
     const mongo = new MongoClient(process.env.MONGO_URL);
 
-    mongo.connect(
-      (err, client) => {
-        if (err) {
-          console.log('Connection error: ', err)
-          throw err
-        }
-
-        fastify.mongo = client
+    mongo.connect((err, client) => {
+      if (err) {
+        logErrorToFile(err);
+        fastify.log.error('Connection error: ', err);
+        throw err
       }
-    )
+      fastify.mongo = client;
+      fastify.log.info('Connected to MongoDB');
+    });
 
-
-  }
-  catch (error) {
+  } catch (error) {
+    logErrorToFile(error);
     fastify.log.error(error);
   }
 }
