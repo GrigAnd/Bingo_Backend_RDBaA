@@ -1,5 +1,5 @@
-const sign = require("../../../module/sign")
-const { fetchUserBingos } = require("../../../db/user")
+const sign = require("../../../../module/sign")
+const { fetchUserBingos } = require("../../../../db/user")
 
 module.exports = {
   method: "GET",

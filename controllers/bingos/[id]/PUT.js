@@ -24,7 +24,8 @@ function isValidBody(obj) {
 }
 
 module.exports = {
-  method: "POST",
+  method: "PUT",
+  url: "/bingos/:id/",
   config: {
     rateLimit: {
       max: 1,

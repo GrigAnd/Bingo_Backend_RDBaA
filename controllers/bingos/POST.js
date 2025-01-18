@@ -1,5 +1,5 @@
-const { insertBingo } = require('../../../db/user')
-const getUser = require('../../../module/getUser')
+const { insertBingo } = require('../../db/user')
+const getUser = require('../../module/getUser')
 
 function isValidBody(obj) {
   if (obj.title == undefined ||
@@ -25,6 +25,7 @@ function isValidBody(obj) {
 
 module.exports = {
   method: "POST",
+  url: "/bingos/",
   config: {
     rateLimit: {
       max: 1,

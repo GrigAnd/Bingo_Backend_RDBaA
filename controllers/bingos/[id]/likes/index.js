@@ -1,26 +1,28 @@
-const sign = require("../../../module/sign")
-const { updateUserNotification } = require('../../../db/user')
+const sign = require("../../../../module/sign")
+const { updateBingoLike } = require('../../../../db/user')
 
 function isValidBody(obj) {
-  return obj.isAllowed !== undefined
+  return obj.like !== undefined
 }
 
 module.exports = {
   method: "POST",
   config: {
     rateLimit: {
-      max: 10,
+      max: 1,
       timeWindow: 1000
     }
   },
   async execute(fastify, request, reply) {
     try {
+      let id = request.params?.id
+
       if (request.sign.vk_user_id == undefined) {
         reply.code(403).header('Content-Type', 'application/json; charset=utf-8').send()
         return
       }
 
-      let obj = request.body
+      let obj = await JSON.parse(request.body)
 
       if (!isValidBody(obj)) {
         reply.code(400).header('Content-Type', 'application/json; charset=utf-8').send([obj])
@@ -29,9 +31,14 @@ module.exports = {
 
       const client = fastify.pg
 
-      await updateUserNotification(client, request.sign.vk_user_id, obj.isAllowed)
+      let result = await updateBingoLike(client, id, request.sign.vk_user_id, obj.like)
 
-      reply.code(201).header('Content-Type', 'application/json; charset=utf-8').send([])
+      if (result.rowCount !== 1) {
+        reply.code(404).header('Content-Type', 'application/json; charset=utf-8').send("Not Found")
+        return
+      }
+
+      reply.code(200).header('Content-Type', 'application/json; charset=utf-8').send(result)
 
     } catch (error) {
       reply.code(418).header('Content-Type', 'application/json; charset=utf-8').send(error)
