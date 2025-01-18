@@ -6,14 +6,24 @@ const findBingoForClaim = async (client, id) => {
 }
 
 const insertClaim = async (client, userId, obj, bingoData, author) => {
-  await client.query(
-    `INSERT INTO claims (author, reason, comment, bingo_ref, bingo_ref_creator, bingo_text, bingo_size, bingo_privacy, bingo_title, bingo_likes, bingo_edited) 
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+  const res = await client.query(
+    `INSERT INTO claims (author, reason, comment, bingo_ref) 
+     VALUES ($1, $2, $3, $4) RETURNING id`,
     [
       userId,
       obj?.reason,
       obj?.comment,
-      bingoData.id,
+      bingoData.id
+    ]
+  )
+  
+  const claimId = res.rows[0].id
+
+  await client.query(
+    `INSERT INTO claim_details (claim_id, bingo_ref_creator, bingo_text, bingo_size, bingo_privacy, bingo_title, bingo_likes, bingo_edited) 
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [
+      claimId,
       bingoData.ref_creator ?? bingoData.creator,
       bingoData.text,
       bingoData.size,

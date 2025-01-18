@@ -1,12 +1,22 @@
 const getClaims = async (client, id) => {
   if (!id) {
     const res = await client.query(
-      `SELECT * FROM claims WHERE status <= 0 ORDER BY id DESC LIMIT 1`
+      `SELECT c.*, cd.bingo_ref_creator, cd.bingo_text, cd.bingo_size, cd.bingo_privacy, cd.bingo_title, cd.bingo_likes, cd.bingo_edited
+       FROM claims c
+       JOIN claim_details cd ON c.id = cd.claim_id
+       WHERE c.status <= 0
+       ORDER BY c.id DESC
+       LIMIT 1`
     )
     return res.rows
   } else {
     const res = await client.query(
-      `SELECT * FROM claims WHERE bingo_ref = $1 ORDER BY id DESC`, [id]
+      `SELECT c.*, cd.bingo_ref_creator, cd.bingo_text, cd.bingo_size, cd.bingo_privacy, cd.bingo_title, cd.bingo_likes, cd.bingo_edited
+       FROM claims c
+       JOIN claim_details cd ON c.id = cd.claim_id
+       WHERE c.bingo_ref = $1
+       ORDER BY c.id DESC`,
+      [id]
     )
     return res.rows
   }
@@ -28,7 +38,8 @@ const findUserById = async (client, id) => {
 
 const updateBingosModeration = async (client, ref, moderation) => {
   await client.query(
-    `UPDATE bingos SET moderation = $1 WHERE id = $2 OR (ref = $2 AND edited = false)`, [moderation, ref]
+    `UPDATE bingos SET moderation = $1 WHERE id = $2 OR (ref = $2 AND edited = false)`,
+    [moderation, ref]
   )
 }
 
@@ -41,7 +52,10 @@ const updateClaimsStatus = async (client, id, ref, moderation, moderatorId) => {
 
 const updateUsersClaimRating = async (client, ref, moderation) => {
   await client.query(
-    `UPDATE users SET claim_rating = claim_rating + $1 WHERE id IN (SELECT author FROM claims WHERE bingo_ref = $2)`,
+    `UPDATE users SET claim_rating = claim_rating + $1 
+     WHERE id IN (
+       SELECT author FROM claims WHERE bingo_ref = $2
+     )`,
     [moderation === 0 ? -1 : 1, ref]
   )
 }
@@ -55,7 +69,13 @@ const updateCreatorRating = async (client, creatorId, moderation) => {
 
 const getPendingClaims = async (client) => {
   const res = await client.query(
-    `SELECT *, to_timestamp(id::bigint/1000) AS date FROM claims WHERE status <= 0 ORDER BY id DESC LIMIT 10`
+    `SELECT c.*, cd.bingo_ref_creator, cd.bingo_text, cd.bingo_size, cd.bingo_privacy, cd.bingo_title, cd.bingo_likes, cd.bingo_edited,
+            to_timestamp(c.id::bigint/1000) AS date
+     FROM claims c
+     JOIN claim_details cd ON c.id = cd.claim_id
+     WHERE c.status <= 0
+     ORDER BY c.id DESC
+     LIMIT 10`
   )
   return res.rows
 }
