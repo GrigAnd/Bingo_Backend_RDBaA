@@ -1,4 +1,10 @@
-const ObjectId = require('mongodb').ObjectID;
+const {
+  findClaimById,
+  updateBingosModeration,
+  updateClaimsStatus,
+  updateUsersClaimRating,
+  updateCreatorRating
+} = require('../../../db/admin')
 
 module.exports = {
   method: "POST",
@@ -32,119 +38,27 @@ module.exports = {
       let body = request.body;
 
       const db = fastify.mongo.db('bingo')
-      const bingos = db.collection('bingos');
-      const users = db.collection('users');
-      const claims = db.collection('claims');
+      const bingos = db.collection('bingos')
+      const users = db.collection('users')
+      const claims = db.collection('claims')
 
-      let claim = await claims.findOne({
-        _id: ObjectId(id),
-      })
+      let claim = await findClaimById(claims, id)
 
-      if (claim == undefined) {
-        reply
-          .code(404)
-          .header('Content-Type', 'application/json; charset=utf-8')
-          .send('Not found')
-      } else {
-        bingos.updateMany(
-          {
-            $or: [
-              {
-                "_id": ObjectId(claim.bingo.ref)
-              },
-              {
-                "ref": claim.bingo.ref,
-                "edited": false
-              }
-            ]
-          },
-          {
-            $set: {
-              "moderation": body.moderation,
-            }
-          })
-          .then((result) => {
-            if (result.result.n !== 1) {
-              reply
-                .code(404)
-                .header('Content-Type', 'application/json; charset=utf-8')
-                .send("Not Found");
-            }
-            reply
-              .code(200)
-              .header('Content-Type', 'application/json; charset=utf-8')
-              .send(body.moderation);
-          })
-          .catch((err) => {
-          })
-
-
-        claims.updateMany(
-          {
-            $or: [
-              {
-                "_id": ObjectId(id),
-              },
-              {
-                "bingo.ref": claim.bingo.ref,
-              }
-            ]
-          },
-          {
-            $set: {
-              status: body.moderation == 0 ? 2 : 1,
-              "moderator": +request.sign.vk_user_id,
-            }
-          })
-          .then((result) => {
-          })
-
-
-
-
-        let cls_curs = await claims.find({
-          "bingo.ref": claim.bingo.ref,
-        })
-
-
-        await cls_curs.forEach(function (cl) {
-          users.updateOne(
-            {
-              "id": cl.author
-            },
-            {
-              $inc: {
-                "claim_rating": body.moderation == 0 ? -1 : 1
-              }
-            })
-            .then((result) => {
-            }).catch((err) => {
-            })
-        })
-
-
-        users.updateOne(
-          {
-            "id": claim?.bingo?.ref_creator
-          },
-          {
-            $inc: {
-              "rating": body.moderation == -2 ? -10 : body.moderation
-            }
-          })
-          .then((result) => {
-          }).catch((err) => {
-          })
-
-
+      if (!claim) {
+        reply.code(404).header('Content-Type', 'application/json; charset=utf-8').send('Not found')
+        return
       }
-    }
-    catch (error) {
-      console.error(error);
-      reply
-        .code(418)
-        .header('Content-Type', 'application/json; charset=utf-8')
-        .send(error);
+
+      await updateBingosModeration(bingos, claim.bingo.ref, body.moderation)
+      await updateClaimsStatus(claims, id, claim.bingo.ref, body.moderation, request.sign.vk_user_id)
+      await updateUsersClaimRating(claims, users, claim.bingo.ref, body.moderation)
+      await updateCreatorRating(users, claim.bingo.ref_creator, body.moderation)
+
+      reply.code(200).header('Content-Type', 'application/json; charset=utf-8').send(body.moderation)
+
+    } catch (error) {
+      console.error(error)
+      reply.code(418).header('Content-Type', 'application/json; charset=utf-8').send(error)
     }
   }
 }

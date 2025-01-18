@@ -42,7 +42,7 @@ const logErrorToFile = (error) => {
   fs.appendFileSync(logPath, logMessage);
 };
 
-const start = () => {
+const start = async () => {
   try {
     fastify.listen({
       port: parseInt(process.env.PORT) || 80,
@@ -59,15 +59,14 @@ const start = () => {
 
     const mongo = new MongoClient(process.env.MONGO_URL);
 
-    mongo.connect((err, client) => {
-      if (err) {
-        logErrorToFile(err);
-        fastify.log.error('Connection error: ', err);
-        throw err
-      }
-      fastify.mongo = client;
-      fastify.log.info('Connected to MongoDB');
-    });
+    try {
+      const client = await mongo.connect()
+      fastify.mongo = client
+      fastify.log.info('Connected to MongoDB')
+    } catch (err) {
+      console.error('MongoDB connection error:', err)
+    }
+    
 
   } catch (error) {
     logErrorToFile(error);
