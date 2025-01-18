@@ -16,15 +16,9 @@ module.exports = {
         return
       }
 
-      const db = fastify.mongo.db('bingo')
-      const bingos = db.collection('bingos')
+      const client = fastify.pg
 
-      const aggCursor = await getPublicBingos(bingos, request.sign.vk_user_id)
-
-      let result = []
-      for await (const doc of aggCursor) {
-        result.push(doc)
-      }
+      const result = await getPublicBingos(client, request.sign.vk_user_id)
 
       reply.code(200).header('Content-Type', 'application/json; charset=utf-8').send(result)
 

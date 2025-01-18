@@ -1,4 +1,4 @@
-const MongoClient = require('mongodb').MongoClient;
+const { Client } = require('pg')
 const sign = require("./module/sign");
 const fs = require('fs');
 const path = require('path');
@@ -56,15 +56,20 @@ const start = async () => {
       console.log(`Server listening on http://${process.env.IP || '0.0.0.0'}:${process.env.PORT || 80}`)
     })
 
-
-    const mongo = new MongoClient(process.env.MONGO_URL);
+    const client = new Client({
+      user: process.env.POSTGRES_USER,
+      host: process.env.POSTGRES_HOST || 'localhost',
+      database: process.env.POSTGRES_DB,
+      password: process.env.POSTGRES_PASSWORD,
+      port: parseInt(process.env.POSTGRES_PORT) || 5432
+    })
 
     try {
-      const client = await mongo.connect()
-      fastify.mongo = client
-      fastify.log.info('Connected to MongoDB')
+      await client.connect()
+      fastify.pg = client
+      fastify.log.info('Connected to PostgreSQL')
     } catch (err) {
-      console.error('MongoDB connection error:', err)
+      console.error('PostgreSQL connection error:', err)
     }
     
 

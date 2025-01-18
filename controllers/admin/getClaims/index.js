@@ -26,17 +26,15 @@ module.exports = {
         return;
       }
 
-      const db = fastify.mongo.db('bingo')
-      const result = await getPendingClaims(db)
+      const client = fastify.pg
+      const result = await getPendingClaims(client)
 
       reply
         .code(200)
         .header('Content-Type', 'application/json; charset=utf-8')
         .send(result)
 
-    }
-
-    catch (error) {
+    } catch (error) {
       reply
         .code(418)
         .header('Content-Type', 'application/json; charset=utf-8')

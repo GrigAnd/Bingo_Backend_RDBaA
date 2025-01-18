@@ -27,10 +27,9 @@ module.exports = {
         return
       }
 
-      const db = fastify.mongo.db('bingo')
-      const users = db.collection('users')
+      const client = fastify.pg
 
-      await updateUserNotification(users, request.sign.vk_user_id, obj.isAllowed)
+      await updateUserNotification(client, request.sign.vk_user_id, obj.isAllowed)
 
       reply.code(201).header('Content-Type', 'application/json; charset=utf-8').send([])
 

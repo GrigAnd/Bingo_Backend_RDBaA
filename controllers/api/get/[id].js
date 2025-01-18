@@ -18,18 +18,17 @@ module.exports = {
         return
       }
 
-      const db = fastify.mongo.db('bingo')
-      const bingos = db.collection('bingos')
+      const client = fastify.pg
 
-      let result = await findBingoWithAccess(bingos, id, request.sign.vk_user_id)
+      let result = await findBingoWithAccess(client, id, request.sign.vk_user_id)
 
       if (!result) {
         reply.code(404).header('Content-Type', 'application/json; charset=utf-8').send('Not found')
         return
       }
 
-      result.isLiked = result?.likes?.includes(+request.sign.vk_user_id)
-      result.likes = result?.likes?.length
+      result.isLiked = result.likes && result.likes.includes(+request.sign.vk_user_id)
+      result.likes = result.likes ? result.likes.length : 0
 
       reply.code(200).header('Content-Type', 'application/json; charset=utf-8').send(result)
 

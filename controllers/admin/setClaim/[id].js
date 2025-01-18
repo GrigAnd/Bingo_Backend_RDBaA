@@ -37,22 +37,19 @@ module.exports = {
 
       let body = request.body;
 
-      const db = fastify.mongo.db('bingo')
-      const bingos = db.collection('bingos')
-      const users = db.collection('users')
-      const claims = db.collection('claims')
+      const client = fastify.pg
 
-      let claim = await findClaimById(claims, id)
+      let claim = await findClaimById(client, id)
 
       if (!claim) {
         reply.code(404).header('Content-Type', 'application/json; charset=utf-8').send('Not found')
         return
       }
 
-      await updateBingosModeration(bingos, claim.bingo.ref, body.moderation)
-      await updateClaimsStatus(claims, id, claim.bingo.ref, body.moderation, request.sign.vk_user_id)
-      await updateUsersClaimRating(claims, users, claim.bingo.ref, body.moderation)
-      await updateCreatorRating(users, claim.bingo.ref_creator, body.moderation)
+      await updateBingosModeration(client, claim.bingo_ref, body.moderation)
+      await updateClaimsStatus(client, id, claim.bingo_ref, body.moderation, request.sign.vk_user_id)
+      await updateUsersClaimRating(client, claim.bingo_ref, body.moderation)
+      await updateCreatorRating(client, claim.bingo_ref_creator, body.moderation)
 
       reply.code(200).header('Content-Type', 'application/json; charset=utf-8').send(body.moderation)
 

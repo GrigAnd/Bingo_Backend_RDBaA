@@ -16,18 +16,16 @@ module.exports = {
         return
       }
 
-      const db = fastify.mongo.db('bingo')
-      const users = db.collection('users')
-      const bingos = db.collection('bingos')
+      const client = fastify.pg
 
-      const user = await checkOrCreateUser(users, request.sign.vk_user_id)
+      const user = await checkOrCreateUser(client, request.sign.vk_user_id)
 
       if (!user) {
         reply.code(201).header('Content-Type', 'application/json; charset=utf-8').send([])
         return
       }
 
-      const result = await getUserBingos(bingos, request.sign.vk_user_id)
+      const result = await getUserBingos(client, request.sign.vk_user_id)
 
       reply.code(200).header('Content-Type', 'application/json; charset=utf-8').send(result)
     } catch (error) {

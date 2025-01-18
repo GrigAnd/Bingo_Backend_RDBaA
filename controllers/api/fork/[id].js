@@ -19,19 +19,18 @@ module.exports = {
         return
       }
 
-      const db = fastify.mongo.db('bingo')
-      const bingos = db.collection('bingos')
+      const client = fastify.pg
 
-      let sourceBingo = await findBingoById(bingos, id)
+      let sourceBingo = await findBingoById(client, id)
       if (!sourceBingo) {
         reply.code(404).header('Content-Type', 'application/json; charset=utf-8').send([])
         return
       }
 
       let author = await getUser(request.sign.vk_user_id)
-      let result = await cloneBingo(bingos, request.sign.vk_user_id, sourceBingo, author)
+      let result = await cloneBingo(client, request.sign.vk_user_id, sourceBingo, author)
 
-      reply.code(201).header('Content-Type', 'application/json; charset=utf-8').send(result?.insertedId)
+      reply.code(201).header('Content-Type', 'application/json; charset=utf-8').send(result?.id)
 
     } catch (error) {
       reply.code(418).header('Content-Type', 'application/json; charset=utf-8').send(error)

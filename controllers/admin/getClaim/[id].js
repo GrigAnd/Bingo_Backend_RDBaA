@@ -20,29 +20,21 @@ module.exports = {
         return
       }
 
-      const db = fastify.mongo.db('bingo')
-      const claims = db.collection('claims')
-      const bingos = db.collection('bingos')
-      const users = db.collection('users')
+      const client = fastify.pg
+      const claims = await getClaims(client, request.params?.id)
 
-      const aggCursor = await getClaims(claims, request.params?.id)
-      let claim = []
-      for await (const doc of aggCursor) {
-        claim.push(doc)
-      }
-
-      if (claim.length === 0) {
+      if (claims.length === 0) {
         reply.code(404).header('Content-Type', 'application/json; charset=utf-8').send('No claims found')
         return
       }
 
-      let bingo_id = claim[0].bingo.ref
-      let resp = await findBingoById(bingos, bingo_id)
-      let user = await findUserById(users, claim[0].author)
+      let bingo_id = claims[0].bingo_ref
+      let resp = await findBingoById(client, bingo_id)
+      let user = await findUserById(client, claims[0].author)
 
       reply.code(200).header('Content-Type', 'application/json; charset=utf-8').send({
         bingo: resp,
-        claims: claim,
+        claims: claims,
         user: user
       })
 

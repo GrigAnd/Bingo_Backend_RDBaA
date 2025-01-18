@@ -29,12 +29,11 @@ module.exports = {
         return
       }
 
-      const db = fastify.mongo.db('bingo')
-      const bingos = db.collection('bingos')
+      const client = fastify.pg
 
-      let result = await updateBingoIsChecked(bingos, id, request.sign.vk_user_id, obj.isChecked)
+      let result = await updateBingoIsChecked(client, id, request.sign.vk_user_id, obj.isChecked)
 
-      if (result.matchedCount !== 1) {
+      if (result.rowCount !== 1) {
         reply.code(404).header('Content-Type', 'application/json; charset=utf-8').send("Not Found")
         return
       }

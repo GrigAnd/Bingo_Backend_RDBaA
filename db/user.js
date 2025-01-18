@@ -1,254 +1,198 @@
-const { ObjectId } = require('mongodb')
-
-const findBingoForClaim = async (bingos, id) => {
-  return await bingos.findOne({
-    _id: ObjectId(id),
-    privacy: { $lte: 1 },
-    status: 0
-  })
-}
-
-const insertClaim = async (claims, userId, obj, bingoData, author) => {
-  return await claims.insertOne({
-    author: +userId,
-    reason: obj?.reason,
-    comment: obj?.comment,
-    bingo: {
-      isChecked: 0,
-      status: 0,
-      cr_name: author.name,
-      cr_ava: author.ava,
-      ref: bingoData._id,
-      ref_creator: bingoData.ref_creator ?? bingoData.creator,
-      text: bingoData.text,
-      size: bingoData.size,
-      privacy: bingoData.privacy,
-      title: bingoData.title,
-      likes: [],
-      edited: false
-    }
-  })
-}
-
-const insertBingo = async (bingos, userId, author, obj) => {
-  return await bingos.insertOne({
-    creator: +userId,
-    cr_name: author.name,
-    cr_ava: author.ava,
-    privacy: obj.privacy,
-    status: 0,
-    title: obj.title,
-    size: obj.size,
-    text: obj.text,
-    isChecked: 0,
-    likes: [],
-    created: Number(new Date())
-  })
-}
-
-const updateBingoStatus = async (bingos, id, userId) => {
-  return await bingos.updateOne(
-    {
-      _id: ObjectId(id),
-      creator: +userId,
-      status: 0
-    },
-    { $set: { status: 1 } }
+const findBingoForClaim = async (client, id) => {
+  const res = await client.query(
+    `SELECT * FROM bingos WHERE id = $1 AND privacy <= 1 AND status = 0`, [id]
   )
+  return res.rows[0]
 }
 
-const updateBingo = async (bingos, id, userId, obj) => {
-  return await bingos.updateOne(
-    {
-      _id: ObjectId(id),
-      creator: +userId
-    },
-    {
-      $set: {
-        privacy: obj.privacy,
-        title: obj.title,
-        text: obj.text,
-        size: obj.size
-      }
-    }
-  )
-}
-
-const findBingoById = async (bingos, id) => {
-  return await bingos.findOne({
-    _id: ObjectId(id),
-    privacy: { $lte: 1 },
-    status: 0
-  })
-}
-
-const cloneBingo = async (bingos, userId, sourceBingo, author) => {
-  return await bingos.insertOne({
-    creator: +userId,
-    isChecked: 0,
-    status: 0,
-    cr_name: author.name,
-    cr_ava: author.ava,
-    ref: sourceBingo._id,
-    ref_creator: sourceBingo.ref_creator ?? sourceBingo.creator,
-    text: sourceBingo.text,
-    size: sourceBingo.size,
-    privacy: sourceBingo.privacy,
-    title: sourceBingo.title,
-    likes: [],
-    edited: false,
-    created: Number(new Date())
-  })
-}
-
-const findBingoWithAccess = async (bingos, id, userId) => {
-  return await bingos.findOne({
-    _id: ObjectId(id),
-    status: 0,
-    moderation: { $not: { $lt: -1 } },
-    $or: [
-      { privacy: { $lte: 1 } },
-      { creator: +userId }
+const insertClaim = async (client, userId, obj, bingoData, author) => {
+  await client.query(
+    `INSERT INTO claims (author, reason, comment, bingo_ref, bingo_ref_creator, bingo_text, bingo_size, bingo_privacy, bingo_title, bingo_likes, bingo_edited) 
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [
+      userId,
+      obj?.reason,
+      obj?.comment,
+      bingoData.id,
+      bingoData.ref_creator ?? bingoData.creator,
+      bingoData.text,
+      bingoData.size,
+      bingoData.privacy,
+      bingoData.title,
+      [],
+      false
     ]
-  })
+  )
 }
 
-const getPublicBingos = async (bingos, userId) => {
-  return await bingos.aggregate([
-    {
-      $match: {
-        privacy: { $lte: 0 },
-        status: 0,
-        moderation: { $not: { $lt: 0 } },
-        nonpop: undefined,
-        ref: undefined
-      }
-    },
-    {
-      $project: {
-        privacy: 0,
-        status: 0,
-        moderation: 0
-      }
-    },
-    {
-      $addFields: {
-        isLiked: { $in: [+userId, "$likes"] },
-        likes: { $size: "$likes" }
-      }
-    },
-    {
-      $sort: { created: -1 }
-    },
-    {
-      $limit: 100
-    }
-  ])
+const insertBingo = async (client, userId, author, obj) => {
+  const res = await client.query(
+    `INSERT INTO bingos (creator, cr_name, cr_ava, privacy, status, title, size, text, is_checked, likes, created)
+     VALUES ($1, $2, $3, $4, 0, $5, $6, $7, FALSE, ARRAY[]::INTEGER[], $8) RETURNING id`,
+    [
+      userId,
+      author.name,
+      author.ava,
+      obj.privacy,
+      obj.title,
+      obj.size,
+      obj.text,
+      Date.now()
+    ]
+  )
+  return res.rows[0]
 }
 
-const getPopularBingos = async (bingos, userId, time) => {
-  return await bingos.aggregate([
-    {
-      $match: {
-        privacy: { $lte: 0 },
-        status: 0,
-        moderation: { $not: { $lt: 0 } },
-        created: { $gte: time },
-        nonpop: undefined,
-        ref: undefined
-      }
-    },
-    {
-      $project: {
-        privacy: 0,
-        status: 0,
-        moderation: 0
-      }
-    },
-    {
-      $addFields: {
-        isLiked: { $in: [+userId, "$likes"] },
-        likes: { $size: "$likes" }
-      }
-    },
-    {
-      $sort: { likes: -1 }
-    },
-    {
-      $limit: 100
-    }
-  ])
+const updateBingoStatus = async (client, id, userId) => {
+  const res = await client.query(
+    `UPDATE bingos SET status = 1 WHERE id = $1 AND creator = $2 AND status = 0`,
+    [id, userId]
+  )
+  return res
 }
 
-const checkOrCreateUser = async (users, userId) => {
-  const user = await users.findOne({ id: +userId })
-  if (!user) {
-    await users.insertOne({ id: +userId })
+const updateBingo = async (client, id, userId, obj) => {
+  const res = await client.query(
+    `UPDATE bingos SET privacy = $1, title = $2, text = $3, size = $4 WHERE id = $5 AND creator = $6`,
+    [obj.privacy, obj.title, obj.text, obj.size, id, userId]
+  )
+  return res
+}
+
+const findBingoById = async (client, id) => {
+  const res = await client.query(
+    `SELECT * FROM bingos WHERE id = $1 AND privacy <= 1 AND status = 0`, [id]
+  )
+  return res.rows[0]
+}
+
+const cloneBingo = async (client, userId, sourceBingo, author) => {
+  const res = await client.query(
+    `INSERT INTO bingos (creator, is_checked, status, cr_name, cr_ava, ref, ref_creator, text, size, privacy, title, likes, edited, created)
+     VALUES ($1, 0, 0, $2, $3, $4, $5, $6, $7, $8, $9, ARRAY[]::INTEGER[], false, $10) RETURNING id`,
+    [
+      userId,
+      author.name,
+      author.ava,
+      sourceBingo.id,
+      sourceBingo.ref_creator ?? sourceBingo.creator,
+      sourceBingo.text,
+      sourceBingo.size,
+      sourceBingo.privacy,
+      sourceBingo.title,
+      Date.now()
+    ]
+  )
+  return res.rows[0]
+}
+
+const updateUserNotification = async (client, userId, isAllowed) => {
+  await client.query(
+    `UPDATE users SET notify = $1 WHERE id = $2`,
+    [isAllowed, userId]
+  )
+}
+
+const findBingoWithAccess = async (client, id, userId) => {
+  const res = await client.query(
+    `SELECT *, ($1 = ANY(likes)) AS isLiked, array_length(likes, 1) AS likes FROM bingos WHERE id = $2 AND status = 0 AND (privacy <= 1 OR creator = $1)`,
+    [userId, id]
+  )
+  return res.rows[0]
+}
+
+const getPublicBingos = async (client, userId) => {
+  const res = await client.query(
+    `SELECT *, ($1 = ANY(likes)) AS isLiked, array_length(likes, 1) AS likes
+     FROM bingos
+     WHERE privacy <= 0 AND status = 0 AND moderation >= 0 AND ref IS NULL AND nonpop IS NULL
+     ORDER BY created DESC
+     LIMIT 100`,
+    [userId]
+  )
+  return res.rows
+}
+
+const getPopularBingos = async (client, userId, time) => {
+  const res = await client.query(
+    `SELECT *, ($1 = ANY(likes)) AS isLiked, array_length(likes, 1) AS likes
+     FROM bingos
+     WHERE privacy <= 0 AND status = 0 AND moderation >= 0 AND created >= $2 AND ref IS NULL AND nonpop IS NULL
+     ORDER BY array_length(likes, 1) DESC
+     LIMIT 100`,
+    [userId, time]
+  )
+  return res.rows
+}
+
+
+const checkOrCreateUser = async (client, userId) => {
+  const res = await client.query(
+    `SELECT * FROM users WHERE id = $1`,
+    [userId]
+  )
+  if (res.rowCount === 0) {
+    await client.query(
+      `INSERT INTO users (id) VALUES ($1)`,
+      [userId]
+    )
     return null
   }
-  return user
+  return res.rows[0]
 }
 
-const getUserBingos = async (bingos, userId) => {
-  const results = await bingos.find({
-    creator: +userId,
-    status: 0,
-    moderation: { $not: { $lt: -1 } }
-  }).sort({ created: -1 }).toArray()
-
-  return results.map(res => {
-    return {
-      ...res,
-      isLiked: res.likes && res.likes.includes(+userId),
-      likes: res.likes.length
-    }
-  })
+const getUserBingos = async (client, userId) => {
+  const res = await client.query(
+    `SELECT *, ($1 = ANY(likes)) AS isLiked, array_length(likes, 1) AS likes
+     FROM bingos
+     WHERE creator = $1 AND status = 0 AND moderation >= -1
+     ORDER BY created DESC`,
+    [userId]
+  )
+  return res.rows
 }
 
-const updateBingoLike = async (bingos, id, userId, like) => {
-  return await bingos.updateOne(
-    {
-      _id: ObjectId(id),
-      $or: [{ privacy: { $lte: 1 } }, { creator: +userId }],
-      status: 0
-    },
-    like == 1
-      ? { $addToSet: { likes: +userId } }
-      : { $pull: { likes: +userId } }
+const updateBingoLike = async (client, id, userId, like) => {
+  const query = like === 1 ?
+    `UPDATE bingos SET likes = array_append(likes, $1) WHERE id = $2 AND (privacy <= 1 OR creator = $1) AND status = 0` :
+    `UPDATE bingos SET likes = array_remove(likes, $1) WHERE id = $2 AND (privacy <= 1 OR creator = $1) AND status = 0`
+
+  const res = await client.query(query, [userId, id])
+  return res
+}
+
+const updateBingoIsChecked = async (client, id, userId, isChecked) => {
+  await client.query(
+    `UPDATE bingos SET is_checked = $1 WHERE id = $2 AND creator = $3`,
+    [isChecked, id, userId]
   )
 }
 
-const updateUserNotification = async (users, userId, isAllowed) => {
-  return await users.updateOne(
-    { id: +userId },
-    { $set: { notify: isAllowed } }
+async function fetchUserBingos(client, creatorId, vkUserId) {
+  const res = await client.query(
+    `SELECT *, ($1 = ANY(likes)) AS isLiked, array_length(likes, 1) AS likes
+     FROM bingos
+     WHERE creator = $2 AND privacy <= 0 AND status <= 0 AND moderation >= -1`,
+    [vkUserId, creatorId]
   )
-}
-
-const updateBingoIsChecked = async (bingos, id, userId, isChecked) => {
-  return await bingos.updateOne(
-    {
-      _id: ObjectId(id),
-      creator: +userId
-    },
-    { $set: { isChecked: isChecked } }
-  )
+  return res.rows
 }
 
 module.exports = {
-  findBingoWithAccess,
+  findBingoForClaim,
+  insertClaim,
+  insertBingo,
+  updateBingoStatus,
   updateBingo,
   findBingoById,
   cloneBingo,
-  updateBingoStatus,
-  insertBingo,
-  findBingoForClaim,
-  insertClaim,
+  updateBingoLike,
+  updateUserNotification,
+  findBingoWithAccess,
   getPublicBingos,
   getPopularBingos,
   checkOrCreateUser,
   getUserBingos,
-  updateBingoLike,
-  updateUserNotification,
-  updateBingoIsChecked
+  updateBingoIsChecked,
+  fetchUserBingos
 }

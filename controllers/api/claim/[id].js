@@ -19,18 +19,16 @@ module.exports = {
       }
 
       let obj = request.body
-      const db = fastify.mongo.db('bingo')
-      const bingos = db.collection('bingos')
-      const claims = db.collection('claims')
+      const client = fastify.pg
 
-      let result = await findBingoForClaim(bingos, id)
+      let result = await findBingoForClaim(client, id)
       if (!result) {
         reply.code(404).header('Content-Type', 'application/json; charset=utf-8').send([])
         return
       }
 
       let author = await getUser(request.sign.vk_user_id)
-      await insertClaim(claims, request.sign.vk_user_id, obj, result, author)
+      await insertClaim(client, request.sign.vk_user_id, obj, result, author)
 
       reply.code(201).header('Content-Type', 'application/json; charset=utf-8').send()
 

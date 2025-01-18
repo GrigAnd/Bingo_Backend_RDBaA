@@ -46,12 +46,11 @@ module.exports = {
       return
     }
 
-    const db = fastify.mongo.db('bingo')
-    const bingos = db.collection('bingos')
+    const client = fastify.pg
 
     let author = await getUser(request.sign.vk_user_id)
-    let result = await insertBingo(bingos, request.sign.vk_user_id, author, obj)
+    let result = await insertBingo(client, request.sign.vk_user_id, author, obj)
 
-    reply.code(201).header('Content-Type', 'application/json; charset=utf-8').send(result?.insertedId)
+    reply.code(201).header('Content-Type', 'application/json; charset=utf-8').send(result?.insertId)
   }
 }

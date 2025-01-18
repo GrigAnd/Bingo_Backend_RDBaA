@@ -1,116 +1,69 @@
-const { ObjectId } = require('mongodb')
-
-const findClaimById = async (claims, id) => {
-  return await claims.findOne({ _id: ObjectId(id) })
-}
-
-const updateBingosModeration = async (bingos, ref, moderation) => {
-  return await bingos.updateMany(
-    {
-      $or: [
-        { "_id": ObjectId(ref) },
-        { "ref": ref, "edited": false }
-      ]
-    },
-    { $set: { moderation } }
-  )
-}
-
-const updateClaimsStatus = async (claims, id, ref, moderation, moderatorId) => {
-  return await claims.updateMany(
-    {
-      $or: [
-        { "_id": ObjectId(id) },
-        { "bingo.ref": ref }
-      ]
-    },
-    {
-      $set: {
-        status: moderation == 0 ? 2 : 1,
-        moderator: +moderatorId
-      }
-    }
-  )
-}
-
-const updateUsersClaimRating = async (claims, users, ref, moderation) => {
-  const cls_curs = await claims.find({ "bingo.ref": ref })
-  for await (const cl of cls_curs) {
-    await users.updateOne(
-      { id: cl.author },
-      { $inc: { claim_rating: moderation == 0 ? -1 : 1 } }
+const getClaims = async (client, id) => {
+  if (!id) {
+    const res = await client.query(
+      `SELECT * FROM claims WHERE status <= 0 ORDER BY id DESC LIMIT 1`
     )
+    return res.rows
+  } else {
+    const res = await client.query(
+      `SELECT * FROM claims WHERE bingo_ref = $1 ORDER BY id DESC`, [id]
+    )
+    return res.rows
   }
 }
 
-const updateCreatorRating = async (users, creatorId, moderation) => {
-  await users.updateOne(
-    { id: creatorId },
-    { $inc: { rating: moderation == -2 ? -10 : moderation } }
+const findBingoById = async (client, id) => {
+  const res = await client.query(
+    `SELECT * FROM bingos WHERE id = $1`, [id]
+  )
+  return res.rows[0]
+}
+
+const findUserById = async (client, id) => {
+  const res = await client.query(
+    `SELECT * FROM users WHERE id = $1`, [id]
+  )
+  return res.rows[0]
+}
+
+const updateBingosModeration = async (client, ref, moderation) => {
+  await client.query(
+    `UPDATE bingos SET moderation = $1 WHERE id = $2 OR (ref = $2 AND edited = false)`, [moderation, ref]
   )
 }
 
-const getPendingClaims = async (db) => {
-  const claims = db.collection('claims')
-  const aggCursor = await claims.aggregate([
-    {
-      $match: {
-        status: { $not: { $gt: 0 } }
-      }
-    },
-    {
-      $addFields: {
-        date: { $toDate: "$_id" }
-      }
-    },
-    {
-      $sort: {
-        _id: -1
-      }
-    },
-    {
-      $limit: 10
-    }
-  ])
-
-  let result = []
-  for await (const doc of aggCursor) {
-    result.push(doc)
-  }
-
-  return result
+const updateClaimsStatus = async (client, id, ref, moderation, moderatorId) => {
+  await client.query(
+    `UPDATE claims SET status = $1, moderator = $2 WHERE id = $3 OR bingo_ref = $4`,
+    [moderation === 0 ? 2 : 1, moderatorId, id, ref]
+  )
 }
 
-const getClaims = async (claims, id) => {
-  if (!id || id.length === 0) {
-    return claims.aggregate([
-      { $match: { status: { $not: { $gt: 0 } } } },
-      { $addFields: { date: { $toDate: "$_id" } } },
-      { $sort: { _id: -1 } },
-      { $limit: 1 }
-    ])
-  } else {
-    return claims.aggregate([
-      { $match: { "bingo.ref": id } },
-      { $addFields: { date: { $toDate: "_id" } } },
-      { $sort: { _id: -1 } }
-    ])
-  }
+const updateUsersClaimRating = async (client, ref, moderation) => {
+  await client.query(
+    `UPDATE users SET claim_rating = claim_rating + $1 WHERE id IN (SELECT author FROM claims WHERE bingo_ref = $2)`,
+    [moderation === 0 ? -1 : 1, ref]
+  )
 }
 
-const findBingoById = async (bingos, id) => {
-  return await bingos.findOne({ _id: ObjectId(id) })
+const updateCreatorRating = async (client, creatorId, moderation) => {
+  await client.query(
+    `UPDATE users SET rating = rating + $1 WHERE id = $2`,
+    [moderation === -2 ? -10 : moderation, creatorId]
+  )
 }
 
-const findUserById = async (users, id) => {
-  return await users.findOne({ id })
+const getPendingClaims = async (client) => {
+  const res = await client.query(
+    `SELECT *, to_timestamp(id::bigint/1000) AS date FROM claims WHERE status <= 0 ORDER BY id DESC LIMIT 10`
+  )
+  return res.rows
 }
 
 module.exports = {
   getClaims,
   findBingoById,
   findUserById,
-  findClaimById,
   updateBingosModeration,
   updateClaimsStatus,
   updateUsersClaimRating,
