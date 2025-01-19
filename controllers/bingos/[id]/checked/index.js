@@ -1,5 +1,5 @@
-const sign = require("../../../module/sign")
-const { updateBingoIsChecked } = require('../../../db/user')
+const sign = require("../../../../module/sign")
+const { updateBingoIsChecked } = require('../../../../db/user')
 
 function isValidBody(obj) {
   return obj.isChecked !== undefined && obj.isChecked >= 0 && obj.isChecked <= 2 ** 25

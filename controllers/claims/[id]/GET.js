@@ -2,6 +2,7 @@ const { getClaims, findBingoById, findUserById } = require('../../../db/admin')
 
 module.exports = {
   method: "GET",
+  url: "/claims/:id/",
   config: {
     rateLimit: {
       max: 1,

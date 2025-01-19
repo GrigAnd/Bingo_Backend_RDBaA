@@ -1,5 +1,6 @@
-const { findBingoForClaim, insertClaim } = require('../../../db/user')
-const getUser = require('../../../module/getUser')
+const sign = require("../../../../module/sign")
+const { findBingoById, cloneBingo } = require('../../../../db/user')
+const getUser = require('../../../../module/getUser')
 
 module.exports = {
   method: "POST",
@@ -18,22 +19,20 @@ module.exports = {
         return
       }
 
-      let obj = request.body
       const client = fastify.pg
 
-      let result = await findBingoForClaim(client, id)
-      if (!result) {
+      let sourceBingo = await findBingoById(client, id)
+      if (!sourceBingo) {
         reply.code(404).header('Content-Type', 'application/json; charset=utf-8').send([])
         return
       }
 
       let author = await getUser(request.sign.vk_user_id)
-      await insertClaim(client, request.sign.vk_user_id, obj, result, author)
+      let result = await cloneBingo(client, request.sign.vk_user_id, sourceBingo, author)
 
-      reply.code(201).header('Content-Type', 'application/json; charset=utf-8').send()
+      reply.code(201).header('Content-Type', 'application/json; charset=utf-8').send(result?.id)
 
     } catch (error) {
-      console.log(error)
       reply.code(418).header('Content-Type', 'application/json; charset=utf-8').send(error)
     }
   }

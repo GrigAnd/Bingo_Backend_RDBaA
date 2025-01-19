@@ -3,6 +3,7 @@ const { findBingoWithAccess } = require('../../../db/user')
 
 module.exports = {
   method: "GET",
+  url: "/bingos/:id/",
   config: {
     rateLimit: {
       max: 10,

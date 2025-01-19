@@ -8,6 +8,7 @@ const {
 
 module.exports = {
   method: "POST",
+  url: "/claims/:id/",
   config: {
     rateLimit: {
       max: 1,

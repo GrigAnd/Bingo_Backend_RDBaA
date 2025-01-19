@@ -1,7 +1,8 @@
-const { getPendingClaims } = require('../../../db/admin')
+const { getPendingClaims } = require('../../db/admin')
 
 module.exports = {
   method: "GET",
+  url: "/claims/",
   config: {
     rateLimit: {
       max: 1,
