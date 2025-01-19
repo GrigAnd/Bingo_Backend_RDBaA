@@ -1,8 +1,6 @@
-const sign = require("../../../module/sign");
-const MongoClient = require('mongodb').MongoClient;
-const ObjectId = require('mongodb').ObjectID;
+const { findBingoForClaim, insertClaim } = require('../../../db/user')
+const getUser = require('../../../module/getUser')
 
-const getUser = require('../../../module/getUser');
 module.exports = {
   method: "POST",
   config: {
@@ -13,68 +11,30 @@ module.exports = {
   },
   async execute(fastify, request, reply) {
     try {
-      let id = request.params?.id;
+      let id = request.params?.id
 
       if (request.sign.vk_user_id == undefined) {
-        reply
-          .code(403)
-          .header('Content-Type', 'application/json; charset=utf-8')
-          .send();
+        reply.code(403).header('Content-Type', 'application/json; charset=utf-8').send()
         return
       }
 
-      let obj = request.body;
-      console.log(obj);
+      let obj = request.body
+      const client = fastify.pg
 
-      const db = fastify.mongo.db('bingo')
-      const bingos = db.collection('bingos');
-      const claims = db.collection('claims');
+      let result = await findBingoForClaim(client, id)
+      if (!result) {
+        reply.code(404).header('Content-Type', 'application/json; charset=utf-8').send([])
+        return
+      }
 
-        result = await bingos.findOne({
-          _id: ObjectId(id),
-          privacy: { $lte: 1 },
-          status: 0
-        })
-        if (result == null || result.length === 0) {
-          reply
-            .code(404)
-            .header('Content-Type', 'application/json; charset=utf-8')
-            .send([])
-          return
-        }
-        let author = await getUser(request.sign.vk_user_id)
-        claims.insertOne({
-          author: +request.sign.vk_user_id,
-          reason: obj?.reason,
-          comment: obj?.comment,
-          bingo: {
-            isChecked: 0,
-            status: 0,
-            cr_name: author.name,
-            cr_ava: author.ava,
-            ref: request.params?.id,
-            ref_creator: result.ref_creator ?? result.creator,
-            text: result.text,
-            size: result.size,
-            privacy: result.privacy,
-            title: result.title,
-            likes: [],
-            edited: false
-          }
+      let author = await getUser(request.sign.vk_user_id)
+      await insertClaim(client, request.sign.vk_user_id, obj, result, author)
 
-        }).then((result) => {
-          reply
-            .code(201)
-            .header('Content-Type', 'application/json; charset=utf-8')
-            .send();
-        })
-    }
-    catch (error) {
+      reply.code(201).header('Content-Type', 'application/json; charset=utf-8').send()
+
+    } catch (error) {
       console.log(error)
-      reply
-        .code(418)
-        .header('Content-Type', 'application/json; charset=utf-8')
-        .send(error);
+      reply.code(418).header('Content-Type', 'application/json; charset=utf-8').send(error)
     }
   }
 }

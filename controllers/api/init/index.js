@@ -1,4 +1,5 @@
-const sign = require("../../../module/sign");
+const sign = require("../../../module/sign")
+const { checkOrCreateUser, getUserBingos } = require('../../../db/user')
 
 module.exports = {
   method: "GET",
@@ -11,63 +12,24 @@ module.exports = {
   async execute(fastify, request, reply) {
     try {
       if (request.sign.vk_user_id == undefined) {
-        reply
-          .code(403)
-          .header('Content-Type', 'application/json; charset=utf-8')
-          .send();
+        reply.code(403).header('Content-Type', 'application/json; charset=utf-8').send()
+        return
       }
 
-      const db = fastify.mongo.db('bingo')
-      const users = db.collection('users');
-      const bingos = db.collection('bingos');
-      users.findOne({
-        id: +request.sign.vk_user_id
-      }).then((result) => {
+      const client = fastify.pg
 
-        if (result == null) {
-          users.insertOne({
-            id: +request.sign.vk_user_id
-          }).then((result) => {
-            reply
-              .code(201)
-              .header('Content-Type', 'application/json; charset=utf-8')
-              .send([]);
-          })
+      const user = await checkOrCreateUser(client, request.sign.vk_user_id)
 
+      if (!user) {
+        reply.code(201).header('Content-Type', 'application/json; charset=utf-8').send([])
+        return
+      }
 
-        } else {
-          bingos.find({
-            creator: +request.sign.vk_user_id,
-            status: 0,
-            moderation: { $not: { $lt: -1 } },
-          }).sort({ created: -1 }).toArray(function (err, result) {
-            if (result.length === 0) {
-              reply
-                .code(200)
-                .header('Content-Type', 'application/json; charset=utf-8')
-                .send([])
-            }
+      const result = await getUserBingos(client, request.sign.vk_user_id)
 
-            result = result.map((res) => {
-              res = { ...res, isLiked: res.likes && res.likes.includes(+request.sign.vk_user_id) }
-              res.likes = res.likes.length
-              return res
-            })
-
-
-            reply
-              .code(200)
-              .header('Content-Type', 'application/json; charset=utf-8')
-              .send(result)
-          })
-        }
-      })
-    }
-    catch (error) {
-      reply
-        .code(418)
-        .header('Content-Type', 'application/json; charset=utf-8')
-        .send(error);
+      reply.code(200).header('Content-Type', 'application/json; charset=utf-8').send(result)
+    } catch (error) {
+      reply.code(418).header('Content-Type', 'application/json; charset=utf-8').send(error)
     }
   }
 }

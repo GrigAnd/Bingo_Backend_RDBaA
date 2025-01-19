@@ -1,4 +1,4 @@
-const MongoClient = require('mongodb').MongoClient;
+const { Client } = require('pg')
 const sign = require("./module/sign");
 const fs = require('fs');
 const path = require('path');
@@ -42,7 +42,7 @@ const logErrorToFile = (error) => {
   fs.appendFileSync(logPath, logMessage);
 };
 
-const start = () => {
+const start = async () => {
   try {
     fastify.listen({
       port: parseInt(process.env.PORT) || 80,
@@ -56,18 +56,22 @@ const start = () => {
       console.log(`Server listening on http://${process.env.IP || '0.0.0.0'}:${process.env.PORT || 80}`)
     })
 
+    const client = new Client({
+      user: process.env.POSTGRES_USER,
+      host: process.env.POSTGRES_HOST || 'localhost',
+      database: process.env.POSTGRES_DB,
+      password: process.env.POSTGRES_PASSWORD,
+      port: parseInt(process.env.POSTGRES_PORT) || 5432
+    })
 
-    const mongo = new MongoClient(process.env.MONGO_URL);
-
-    mongo.connect((err, client) => {
-      if (err) {
-        logErrorToFile(err);
-        fastify.log.error('Connection error: ', err);
-        throw err
-      }
-      fastify.mongo = client;
-      fastify.log.info('Connected to MongoDB');
-    });
+    try {
+      await client.connect()
+      fastify.pg = client
+      fastify.log.info('Connected to PostgreSQL')
+    } catch (err) {
+      console.error('PostgreSQL connection error:', err)
+    }
+    
 
   } catch (error) {
     logErrorToFile(error);

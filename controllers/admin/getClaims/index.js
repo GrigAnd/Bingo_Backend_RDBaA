@@ -1,3 +1,5 @@
+const { getPendingClaims } = require('../../../db/admin')
+
 module.exports = {
   method: "GET",
   config: {
@@ -24,44 +26,15 @@ module.exports = {
         return;
       }
 
-      const db = fastify.mongo.db('bingo')
-      const claims = db.collection('claims');
-
-      const aggCursor = await claims.aggregate([
-        {
-          $match: {
-            status: { $not: { $gt: 0 } }
-          }
-        },
-        {
-          $addFields: {
-            date: { $toDate: "$_id" }
-          }
-        },
-        {
-          $sort: {
-            _id: -1
-          }
-        },
-        {
-          $limit: 10
-        }
-      ])
-
-      let result = []
-      for await (const doc of aggCursor) {
-        console.log(doc);
-        result.push(doc)
-      }
+      const client = fastify.pg
+      const result = await getPendingClaims(client)
 
       reply
         .code(200)
         .header('Content-Type', 'application/json; charset=utf-8')
         .send(result)
 
-    }
-
-    catch (error) {
+    } catch (error) {
       reply
         .code(418)
         .header('Content-Type', 'application/json; charset=utf-8')

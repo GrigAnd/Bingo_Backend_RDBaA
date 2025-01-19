@@ -1,29 +1,21 @@
-const sign = require("../../../module/sign");
-const MongoClient = require('mongodb').MongoClient;
-const fetch = require('node-fetch');
-const getUser = require('../../../module/getUser');
+const { insertBingo } = require('../../../db/user')
+const getUser = require('../../../module/getUser')
 
 function isValidBody(obj) {
   if (obj.title == undefined ||
-    typeof obj.title != "string" ||
-    obj.title.length < 2 ||
-    obj.title.length > 20 ||
-
-    obj.size == undefined ||
-    obj.size > 5 ||
-    obj.size < 3 ||
-
-    obj.text == undefined ||
-    obj.text.length != obj.size ** 2) {
-
+      typeof obj.title != "string" ||
+      obj.title.length < 2 ||
+      obj.title.length > 20 ||
+      obj.size == undefined ||
+      obj.size > 5 ||
+      obj.size < 3 ||
+      obj.text == undefined ||
+      obj.text.length != obj.size ** 2) {
     return false
   }
 
-  for (i of obj.text) {
-    if (typeof i != "string") {
-      return false
-    }
-    if (i.length == undefined || i.length > 100) {
+  for (let i of obj.text) {
+    if (typeof i != "string" || i.length == undefined || i.length > 100) {
       return false
     }
   }
@@ -40,56 +32,25 @@ module.exports = {
     }
   },
   async execute(fastify, request, reply) {
-    // try {
-
-
-
     if (request.sign.vk_user_id == undefined) {
-      reply
-        .code(403)
-        .header('Content-Type', 'application/json; charset=utf-8')
-        .send();
+      reply.code(403).header('Content-Type', 'application/json; charset=utf-8').send()
       return
     }
 
-    let obj = request.body;
+    let obj = request.body
 
     if (!isValidBody(obj)) {
-      reply
-        .code(400)
-        .header('Content-Type', 'application/json; charset=utf-8')
-        .send([obj.title,
-        obj.size,
-        obj.isChecked,
-        obj.text]);
+      reply.code(400).header('Content-Type', 'application/json; charset=utf-8').send([
+        obj.title, obj.size, obj.isChecked, obj.text
+      ])
       return
     }
 
-
-
-    const db = fastify.mongo.db('bingo')
-    const bingos = db.collection('bingos');
-    const users = db.collection('users');
+    const client = fastify.pg
 
     let author = await getUser(request.sign.vk_user_id)
-    bingos.insertOne({
-      creator: +request.sign.vk_user_id,
-      cr_name: author.name,
-      cr_ava: author.ava,
-      privacy: obj.privacy,
-      status: 0,
-      title: obj.title,
-      size: obj.size,
-      text: obj.text,
-      isChecked: 0,
-      likes: [],
-      created: Number(new Date())
-    })
-      .then(result => {
-        reply
-          .code(201)
-          .header('Content-Type', 'application/json; charset=utf-8')
-          .send(result?.insertedId);
-      })
+    let result = await insertBingo(client, request.sign.vk_user_id, author, obj)
+
+    reply.code(201).header('Content-Type', 'application/json; charset=utf-8').send(result?.insertId)
   }
 }

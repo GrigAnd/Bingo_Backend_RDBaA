@@ -17,8 +17,8 @@
     "fastify": "^5.2.1",
     "fastify-easy-route": "^1.0.12",
     "first": "file:",
-    "mongodb": "^6.12.0",
     "node-fetch": "^3.3.2",
+    "pg": "^8.13.1",
     "querystring": "^0.2.1"
   },
   "devDependencies": {

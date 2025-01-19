@@ -1,11 +1,8 @@
-const sign = require("../../../module/sign");
+const sign = require("../../../module/sign")
+const { updateUserNotification } = require('../../../db/user')
 
 function isValidBody(obj) {
-  if (obj.isAllowed == undefined) {
-    return false
-  }
-
-  return true
+  return obj.isAllowed !== undefined
 }
 
 module.exports = {
@@ -19,42 +16,25 @@ module.exports = {
   async execute(fastify, request, reply) {
     try {
       if (request.sign.vk_user_id == undefined) {
-        reply
-          .code(403)
-          .header('Content-Type', 'application/json; charset=utf-8')
-          .send();
-      }
-
-      let obj = request.body;
-
-      if (!isValidBody(obj)) {
-        reply
-          .code(400)
-          .header('Content-Type', 'application/json; charset=utf-8')
-          .send([obj]);
+        reply.code(403).header('Content-Type', 'application/json; charset=utf-8').send()
         return
       }
 
-      const db = fastify.mongo.db('bingo')
-      const users = db.collection('users');
+      let obj = request.body
 
+      if (!isValidBody(obj)) {
+        reply.code(400).header('Content-Type', 'application/json; charset=utf-8').send([obj])
+        return
+      }
 
-      users.updateOne({
-        id: +request.sign.vk_user_id
-      },
-      { $set: { "notify": obj.isAllowed } }).then((result) => {
-        reply
-          .code(201)
-          .header('Content-Type', 'application/json; charset=utf-8')
-          .send([]);
-      })
+      const client = fastify.pg
 
-    }
-    catch (error) {
-      reply
-        .code(418)
-        .header('Content-Type', 'application/json; charset=utf-8')
-        .send(error);
+      await updateUserNotification(client, request.sign.vk_user_id, obj.isAllowed)
+
+      reply.code(201).header('Content-Type', 'application/json; charset=utf-8').send([])
+
+    } catch (error) {
+      reply.code(418).header('Content-Type', 'application/json; charset=utf-8').send(error)
     }
   }
 }

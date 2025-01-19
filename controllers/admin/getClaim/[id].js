@@ -1,4 +1,4 @@
-const ObjectId = require('mongodb').ObjectID;
+const { getClaims, findBingoById, findUserById } = require('../../../db/admin')
 
 module.exports = {
   method: "GET",
@@ -11,103 +11,35 @@ module.exports = {
   async execute(fastify, request, reply) {
     try {
       if (request.sign.vk_user_id == undefined) {
-        reply
-          .code(403)
-          .header('Content-Type', 'application/json; charset=utf-8')
-          .send();
-        return;
+        reply.code(403).header('Content-Type', 'application/json; charset=utf-8').send()
+        return
       }
 
       if (request.sign.vk_app_id != process.env.ADMIN_ID) {
-        reply
-          .code(403)
-          .header('Content-Type', 'application/json; charset=utf-8')
-          .send();
-        return;
+        reply.code(403).header('Content-Type', 'application/json; charset=utf-8').send()
+        return
       }
 
-      const db = fastify.mongo.db('bingo')
-      const claims = db.collection('claims');
-      const bingos = db.collection('bingos');
-      const users = db.collection('users');
+      const client = fastify.pg
+      const claims = await getClaims(client, request.params?.id)
 
-
-      let aggCursor;
-      if (request.params?.id?.length == 0) {
-        aggCursor = await claims.aggregate([
-          {
-            $match: {
-              status: { $not: { $gt: 0 } }
-            }
-          },
-          {
-            $addFields: {
-              date: { $toDate: "$_id" }
-            }
-          },
-          {
-            $sort: {
-              _id: -1
-            }
-          },
-          {
-            $limit: 1
-          }
-        ])
-      } else {
-        aggCursor = await claims.aggregate([
-          {
-            $match: {
-              "bingo.ref": request.params.id
-            }
-          },
-          {
-            $addFields: {
-              date: { $toDate: "$_id" }
-            }
-          },
-          {
-            $sort: {
-              _id: -1
-            }
-          }
-        ])
-      }
-      let claim = []
-      for await (const doc of aggCursor) {
-        console.log(doc);
-        claim.push(doc)
+      if (claims.length === 0) {
+        reply.code(404).header('Content-Type', 'application/json; charset=utf-8').send('No claims found')
+        return
       }
 
-      let bingo_id = claim[0].bingo.ref;
+      let bingo_id = claims[0].bingo_ref
+      let resp = await findBingoById(client, bingo_id)
+      let user = await findUserById(client, claims[0].author)
 
-      let resp = await bingos.findOne({
-        _id: ObjectId(bingo_id)
+      reply.code(200).header('Content-Type', 'application/json; charset=utf-8').send({
+        bingo: resp,
+        claims: claims,
+        user: user
       })
 
-      let user = await users.findOne({
-        id: claim[0].author
-      })
-
-
-      reply
-        .code(200)
-        .header('Content-Type', 'application/json; charset=utf-8')
-        .send(
-          {
-            bingo: resp,
-            claims: claim,
-            user: user
-          }
-        )
-
-    }
-
-    catch (error) {
-      reply
-        .code(418)
-        .header('Content-Type', 'application/json; charset=utf-8')
-        .send(error);
+    } catch (error) {
+      reply.code(418).header('Content-Type', 'application/json; charset=utf-8').send(error)
     }
   }
 }
